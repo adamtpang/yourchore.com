@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import morgan from 'morgan';
 import { LaundryService } from './services/laundry/laundry.service';
 import { StripePaymentProvider } from './payments/stripe.provider';
 import { Service, Vendor, PaymentProvider } from './types';
@@ -11,12 +12,7 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-// Request logging middleware
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
-    next();
-});
+app.use(morgan('dev'));
 
 // Service registry
 const services: Record<string, any> = {};
