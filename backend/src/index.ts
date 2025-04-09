@@ -1,78 +1,92 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import cors from 'cors';
-import morgan from 'morgan';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
-interface Order {
-    id: string;
-    roomNumber: string;
-    customerName: string;
-    paymentMethod: string;
-    notes: string;
-    status: string;
-    createdAt: string;
-    cost: number;
-}
+import { LaundryService } from './services/laundry/laundry.service';
+import { StripePaymentProvider } from './payments/stripe.provider';
+import { Service, Vendor, PaymentProvider } from './types';
+import 'dotenv/config';
 
 const app = express();
-
-// Middleware
 app.use(cors());
 app.use(express.json());
-app.use(morgan('dev'));
 
-// In-memory storage
-let orders: Order[] = [];
+// Service registry
+const services: Record<string, any> = {};
+const vendors: Record<string, Vendor> = {};
+const paymentProviders: Record<string, PaymentProvider> = {};
 
-// Routes
-app.post('/api/order', (req: Request, res: Response) => {
-    const { roomNumber, customerName, paymentMethod, notes } = req.body;
-    const newOrder: Order = {
-        id: Date.now().toString(),
-        roomNumber,
-        customerName,
-        paymentMethod,
-        notes,
-        status: 'Pending',
-        createdAt: new Date().toISOString(),
-        cost: 5.00 // Base cost per bag
+// Initialize services
+function initializeServices() {
+    // Initialize payment providers
+    const stripeProvider = new StripePaymentProvider({
+        secretKey: process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder',
+        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET
+    });
+    paymentProviders['stripe'] = stripeProvider;
+
+    // Initialize vendors
+    vendors['angie'] = {
+        id: 'angie',
+        name: "Angie's Laundry",
+        description: 'Professional laundry service',
+        isActive: true,
+        services: ['laundry'],
+        royaltyRate: 0.15,
+        paymentMethods: ['stripe'],
+        config: {}
     };
-    orders.push(newOrder);
-    res.status(201).json(newOrder);
+
+    // Initialize services
+    const laundryService = new LaundryService({
+        service: {
+            id: 'laundry',
+            name: 'Laundry Service',
+            description: 'Professional laundry service',
+            isActive: true,
+            basePrice: 15,
+            config: {}
+        },
+        vendor: vendors['angie'],
+        paymentProvider: stripeProvider
+    });
+    services['laundry'] = laundryService;
+}
+
+// API Routes
+app.get('/api/services', (req, res) => {
+    const availableServices = Object.values(services)
+        .map(service => service.getServiceInfo())
+        .filter(service => service.isActive);
+    res.json(availableServices);
 });
 
-app.get('/api/orders', (_req: Request, res: Response) => {
-    res.json(orders);
+app.get('/api/vendors', (req, res) => {
+    const availableVendors = Object.values(vendors)
+        .filter(vendor => vendor.isActive);
+    res.json(availableVendors);
 });
 
-app.put('/api/order/:id', (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { status } = req.body;
+app.post('/api/orders', async (req, res) => {
+    const { serviceId, vendorId, paymentMethodId, ...orderData } = req.body;
 
-    const orderIndex = orders.findIndex(order => order.id === id);
-    if (orderIndex === -1) {
-        return res.status(404).json({ error: 'Order not found' });
+    const service = services[serviceId];
+    if (!service) {
+        return res.status(404).json({ error: 'Service not found' });
     }
 
-    orders[orderIndex] = { ...orders[orderIndex], status };
-    res.json(orders[orderIndex]);
+    try {
+        const order = await service.createOrder({
+            ...orderData,
+            paymentMethodId
+        });
+        res.json(order);
+    } catch (error) {
+        res.status(400).json({ error: error instanceof Error ? error.message : 'Unknown error' });
+    }
 });
 
-// Add some dummy data
-orders.push({
-    id: '1',
-    roomNumber: '101',
-    customerName: 'John Doe',
-    status: 'Washing',
-    paymentMethod: 'Card',
-    notes: 'Please handle with care',
-    createdAt: new Date().toISOString(),
-    cost: 5.00
-});
-
-const PORT = process.env.PORT || 5000;
+// Initialize and start server
+const PORT = process.env.PORT || 3000;
+initializeServices();
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
