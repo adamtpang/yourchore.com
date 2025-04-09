@@ -4,17 +4,15 @@ import { Order } from '../types';
 
 export class StripePaymentProvider implements PaymentProvider {
     private stripe: Stripe;
-    private config: { secretKey: string; webhookSecret?: string };
+    public id = 'stripe';
+    public name = 'Stripe';
+    public isActive = true;
+    public config: any;
 
     constructor(config: { secretKey: string; webhookSecret?: string }) {
         this.config = config;
         this.stripe = new Stripe(config.secretKey, { apiVersion: '2025-03-31.basil' });
     }
-
-    // Implement required PaymentProvider interface properties
-    id = 'stripe';
-    name = 'Stripe';
-    isActive = true;
 
     async processPayment(order: Order): Promise<{
         success: boolean;

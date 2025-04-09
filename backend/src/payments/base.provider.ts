@@ -1,6 +1,11 @@
 import { Order } from '../types';
 
 export interface PaymentProvider {
+    id: string;
+    name: string;
+    isActive: boolean;
+    config: any; // Make config public
+
     // Payment processing
     processPayment(order: Order): Promise<{
         success: boolean;
