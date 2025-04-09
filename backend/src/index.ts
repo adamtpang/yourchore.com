@@ -14,6 +14,11 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
+// Root health check
+app.get('/', (req, res) => {
+    res.json({ status: 'ok', message: 'YourChore API is running' });
+});
+
 // Service registry
 const services: Record<string, any> = {};
 const vendors: Record<string, Vendor> = {};
