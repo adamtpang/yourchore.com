@@ -7,16 +7,40 @@ import { LaundryService } from './services/laundry/laundry.service';
 import { StripePaymentProvider } from './payments/stripe.provider';
 import { Service, Vendor, PaymentProvider } from './types';
 
+// Debug logging
+console.log('Starting server with debug info:');
+console.log('Current directory:', __dirname);
+console.log('Process directory:', process.cwd());
+console.log('Node version:', process.version);
+console.log('Environment:', process.env.NODE_ENV);
+
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: ['http://localhost:5173', 'https://yourchore.com', 'https://yourchorecom-production.up.railway.app'],
+    credentials: true
+}));
 app.use(express.json());
 app.use(morgan('dev'));
 
+// Debug middleware
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - Headers:`, req.headers);
+    next();
+});
+
 // Root health check
 app.get('/', (req, res) => {
-    res.json({ status: 'ok', message: 'YourChore API is running' });
+    res.json({
+        status: 'ok',
+        message: 'YourChore API is running',
+        env: process.env.NODE_ENV,
+        cwd: process.cwd(),
+        dirname: __dirname,
+        node_version: process.version,
+        timestamp: new Date().toISOString()
+    });
 });
 
 // Service registry
@@ -70,17 +94,28 @@ initializeServices();
 // API Routes
 app.get('/api/services', (req, res) => {
     console.log('GET /api/services - Available services:', Object.keys(services));
-    const availableServices = Object.values(services)
-        .map(service => service.getServiceInfo())
-        .filter(service => service.isActive);
-    res.json(availableServices);
+    try {
+        const availableServices = Object.values(services)
+            .map(service => service.getServiceInfo())
+            .filter(service => service.isActive);
+        console.log('Sending services:', availableServices);
+        res.json(availableServices);
+    } catch (error) {
+        console.error('Error in /api/services:', error);
+        res.status(500).json({ error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' });
+    }
 });
 
 app.get('/api/vendors', (req, res) => {
     console.log('GET /api/vendors - Available vendors:', Object.keys(vendors));
-    const availableVendors = Object.values(vendors)
-        .filter(vendor => vendor.isActive);
-    res.json(availableVendors);
+    try {
+        const availableVendors = Object.values(vendors)
+            .filter(vendor => vendor.isActive);
+        res.json(availableVendors);
+    } catch (error) {
+        console.error('Error in /api/vendors:', error);
+        res.status(500).json({ error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' });
+    }
 });
 
 app.post('/api/orders', async (req, res) => {
