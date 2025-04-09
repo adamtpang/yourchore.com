@@ -1,5 +1,5 @@
 import { BaseService } from '../base.service';
-import { Service, Order, ServiceConfig } from '../../types';
+import { Service, Order, ServiceConfig, OrderStatus } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
 export class LaundryService implements BaseService {
@@ -19,7 +19,7 @@ export class LaundryService implements BaseService {
       serviceId: this.config.service.id,
       vendorId: this.config.vendor.id,
       paymentMethodId: data.paymentMethodId!,
-      status: 'PENDING',
+      status: OrderStatus.PENDING,
       totalAmount: await this.calculatePrice(data),
       royaltyFee: 0, // Will be calculated based on vendor's royalty rate
       metadata: data.metadata || {},
@@ -39,7 +39,7 @@ export class LaundryService implements BaseService {
     throw new Error('Not implemented');
   }
 
-  async updateOrderStatus(orderId: string, status: string): Promise<Order> {
+  async updateOrderStatus(orderId: string, status: OrderStatus): Promise<Order> {
     // TODO: Update order status in database
     throw new Error('Not implemented');
   }

@@ -1,9 +1,9 @@
-import express from 'express';
+import 'dotenv/config';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { LaundryService } from './services/laundry/laundry.service';
 import { StripePaymentProvider } from './payments/stripe.provider';
-import { Service, Vendor, PaymentProvider } from './types';
-import 'dotenv/config';
+import { Service, Vendor, PaymentProvider, OrderStatus } from './types';
 
 const app = express();
 app.use(cors());
@@ -52,20 +52,20 @@ function initializeServices() {
 }
 
 // API Routes
-app.get('/api/services', (req, res) => {
+app.get('/api/services', (_req: Request, res: Response) => {
     const availableServices = Object.values(services)
         .map(service => service.getServiceInfo())
         .filter(service => service.isActive);
     res.json(availableServices);
 });
 
-app.get('/api/vendors', (req, res) => {
+app.get('/api/vendors', (_req: Request, res: Response) => {
     const availableVendors = Object.values(vendors)
         .filter(vendor => vendor.isActive);
     res.json(availableVendors);
 });
 
-app.post('/api/orders', async (req, res) => {
+app.post('/api/orders', async (req: Request, res: Response) => {
     const { serviceId, vendorId, paymentMethodId, ...orderData } = req.body;
 
     const service = services[serviceId];
