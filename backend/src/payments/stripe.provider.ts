@@ -11,7 +11,7 @@ export class StripePaymentProvider implements PaymentProvider {
 
     constructor(config: { secretKey: string; webhookSecret?: string }) {
         this.config = config;
-        this.stripe = new Stripe(config.secretKey, { apiVersion: '2025-03-31.basil' });
+        this.stripe = new Stripe(config.secretKey, { apiVersion: '2022-11-15' });
     }
 
     async processPayment(order: Order): Promise<{
