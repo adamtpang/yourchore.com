@@ -13,6 +13,17 @@ console.log('Current directory:', __dirname);
 console.log('Process directory:', process.cwd());
 console.log('Node version:', process.version);
 console.log('Environment:', process.env.NODE_ENV);
+console.log('PORT:', process.env.PORT);
+
+// Error handling for uncaught exceptions
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
 const app = express();
 
@@ -24,9 +35,22 @@ app.use(cors({
 app.use(express.json());
 app.use(morgan('dev'));
 
+// Error handling middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('Global error handler:', err);
+    res.status(500).json({
+        error: 'Internal Server Error',
+        message: err.message,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+});
+
 // Debug middleware
 app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - Headers:`, req.headers);
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    console.log('Headers:', req.headers);
+    console.log('Query:', req.query);
+    console.log('Body:', req.body);
     next();
 });
 
@@ -165,8 +189,28 @@ app.get('*', (req, res) => {
 // Initialize and start server
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV}`);
     console.log(`Static files path: ${path.join(__dirname, '../../frontend/dist')}`);
+});
+
+// Handle server errors
+server.on('error', (error: any) => {
+    if (error.syscall !== 'listen') {
+        throw error;
+    }
+
+    switch (error.code) {
+        case 'EACCES':
+            console.error(`Port ${PORT} requires elevated privileges`);
+            process.exit(1);
+            break;
+        case 'EADDRINUSE':
+            console.error(`Port ${PORT} is already in use`);
+            process.exit(1);
+            break;
+        default:
+            throw error;
+    }
 });
