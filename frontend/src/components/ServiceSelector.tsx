@@ -1,52 +1,52 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { getServices } from '../utils/api';
+import { Service } from '../types/services';
 
-interface Service {
-  id: string;
-  name: string;
-  description: string;
-  isActive: boolean;
-}
+export const ServiceSelector = () => {
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export const ServiceSelector: React.FC = () => {
-  const [services, setServices] = React.useState<Service[]>([]);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    fetch('/api/services')
-      .then(res => res.json())
-      .then(data => {
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        setLoading(true);
+        const data = await getServices();
         setServices(data);
+        setError(null);
+      } catch (err) {
+        setError('Failed to load services. Please try again later.');
+        console.error('Error fetching services:', err);
+      } finally {
         setLoading(false);
-      })
-      .catch(error => {
-        console.error('Error fetching services:', error);
-        setLoading(false);
-      });
+      }
+    };
+
+    fetchServices();
   }, []);
 
   if (loading) {
-    return <div>Loading available services...</div>;
+    return (
+      <div className="animate-pulse">
+        <div className="h-10 bg-gray-200 rounded w-full"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-red-600 text-sm">{error}</div>
+    );
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-      {services.map(service => (
-        <Link
-          key={service.id}
-          to={`/${service.id}`}
-          className={`p-6 rounded-lg shadow-md transition-transform hover:scale-105
-            ${service.isActive ? 'bg-white' : 'bg-gray-100'}`}
-        >
-          <h2 className="text-xl font-bold mb-2">{service.name}</h2>
-          <p className="text-gray-600">{service.description}</p>
-          {!service.isActive && (
-            <span className="inline-block mt-2 px-2 py-1 text-sm bg-yellow-100 text-yellow-800 rounded">
-              Coming Soon
-            </span>
-          )}
-        </Link>
+    <select className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+      <option value="">Select a service...</option>
+      {services.map((service) => (
+        <option key={service.id} value={service.id}>
+          {service.name}
+        </option>
       ))}
-    </div>
+    </select>
   );
 };

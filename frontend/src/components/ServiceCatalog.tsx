@@ -1,5 +1,6 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { getServices } from '../utils/api';
 import { Service } from '../types/services';
 
 // Icons for different service types
@@ -66,45 +67,32 @@ const ServiceCard: React.FC<{ service: Service }> = ({ service }) => {
     );
 };
 
-export const ServiceCatalog: React.FC = () => {
-    const [services, setServices] = React.useState<Service[]>([]);
-    const [loading, setLoading] = React.useState(true);
-    const [error, setError] = React.useState<string | null>(null);
+export const ServiceCatalog = () => {
+    const [services, setServices] = useState<Service[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    React.useEffect(() => {
-        fetch('/api/services')
-            .then(res => res.json())
-            .then(data => {
-                // Add some coming soon services
-                const allServices: Service[] = [
-                    ...data,
-                    {
-                        id: 'food',
-                        name: 'Food Delivery',
-                        description: 'Campus food delivery and meal prep services. Order from local restaurants or get your meals prepped for the week.',
-                        isActive: false,
-                        comingSoon: true
-                    },
-                    {
-                        id: 'cleaning',
-                        name: 'Room Cleaning',
-                        description: 'Professional room and dorm cleaning services. Schedule regular cleanings or one-time deep cleans.',
-                        isActive: false,
-                        comingSoon: true
-                    }
-                ];
-                setServices(allServices);
+    useEffect(() => {
+        const fetchServices = async () => {
+            try {
+                setLoading(true);
+                const data = await getServices();
+                setServices(data);
+                setError(null);
+            } catch (err) {
+                setError('Failed to load services. Please try again later.');
+                console.error('Error fetching services:', err);
+            } finally {
                 setLoading(false);
-            })
-            .catch(err => {
-                setError('Failed to load services');
-                setLoading(false);
-            });
+            }
+        };
+
+        fetchServices();
     }, []);
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center min-h-[400px]">
+            <div className="min-h-[60vh] flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
         );
@@ -112,12 +100,13 @@ export const ServiceCatalog: React.FC = () => {
 
     if (error) {
         return (
-            <div className="text-center py-12">
-                <div className="bg-red-50 rounded-lg p-6 max-w-md mx-auto">
-                    <p className="text-red-600 mb-4">{error}</p>
+            <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
+                <div className="bg-red-50 p-4 rounded-lg max-w-md">
+                    <h3 className="text-red-800 text-lg font-semibold mb-2">Error</h3>
+                    <p className="text-red-600">{error}</p>
                     <button
                         onClick={() => window.location.reload()}
-                        className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                        className="mt-4 px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"
                     >
                         Try Again
                     </button>
@@ -129,18 +118,42 @@ export const ServiceCatalog: React.FC = () => {
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="text-center mb-12">
-                <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                    Campus Life, Simplified
-                </h1>
-                <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                    From laundry to food delivery, we've got your daily chores covered.
-                    Choose a service to get started.
+                <h1 className="text-4xl font-bold text-gray-900 mb-4">Our Services</h1>
+                <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                    Choose from our range of professional services designed to make your life easier.
                 </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {services.map(service => (
-                    <ServiceCard key={service.id} service={service} />
+                {services.map((service) => (
+                    <div
+                        key={service.id}
+                        className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-6"
+                    >
+                        {service.icon && (
+                            <div className="flex justify-center mb-4">
+                                <img
+                                    src={service.icon}
+                                    alt={service.name}
+                                    className="w-16 h-16 object-contain"
+                                />
+                            </div>
+                        )}
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">{service.name}</h3>
+                        <p className="text-gray-600 mb-4">{service.description}</p>
+                        {service.comingSoon ? (
+                            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                                Coming Soon
+                            </div>
+                        ) : (
+                            <Link
+                                to={`/services/${service.id}`}
+                                className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                            >
+                                Learn More
+                            </Link>
+                        )}
+                    </div>
                 ))}
             </div>
         </div>
