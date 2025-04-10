@@ -1,53 +1,157 @@
-export interface Service {
+// Base interfaces
+export interface BaseEntity {
     id: string;
-    name: string;
-    description: string;
-    isActive: boolean;
-    basePrice: number;
-    config: Record<string, any>;
-}
-
-export interface Vendor {
-    id: string;
-    name: string;
-    description: string;
-    isActive: boolean;
-    services: string[]; // Service IDs this vendor supports
-    royaltyRate: number; // Percentage of order total (0-1)
-    paymentMethods: string[]; // Supported payment provider IDs
-    config: Record<string, any>;
-}
-
-export interface PaymentProvider {
-    id: string;
-    name: string;
-    isActive: boolean;
-    config: Record<string, any>;
-}
-
-export interface Order {
-    id: string;
-    serviceId: string;
-    vendorId: string;
-    paymentMethodId: string;
-    status: OrderStatus;
-    totalAmount: number;
-    royaltyFee: number;
-    metadata: Record<string, any>;
     createdAt: Date;
     updatedAt: Date;
 }
 
-export enum OrderStatus {
-    PENDING = 'PENDING',
-    CONFIRMED = 'CONFIRMED',
-    IN_PROGRESS = 'IN_PROGRESS',
-    COMPLETED = 'COMPLETED',
-    CANCELLED = 'CANCELLED'
+// Service related types
+export interface Service extends BaseEntity {
+    name: string;
+    description: string;
+    isActive: boolean;
+    basePrice: number;
+    type: ServiceType;
+    config: ServiceConfig;
+}
+
+export enum ServiceType {
+    LAUNDRY = 'laundry',
+    FOOD = 'food',
+    CLEANING = 'cleaning',
+    ERRANDS = 'errands'
 }
 
 export interface ServiceConfig {
-    service: Service;
-    vendor: Vendor;
-    paymentProvider: PaymentProvider;
+    allowedPaymentMethods: string[];
+    pricing: {
+        base: number;
+        [key: string]: any;
+    };
+    options?: {
+        [key: string]: any;
+    };
+}
+
+// Vendor related types
+export interface Vendor extends BaseEntity {
+    name: string;
+    description: string;
+    isActive: boolean;
+    services: ServiceType[];
+    royaltyRate: number;
+    paymentMethods: string[];
+    config: VendorConfig;
+    contactInfo: ContactInfo;
+}
+
+export interface VendorConfig {
+    serviceSpecificConfig?: {
+        [key in ServiceType]?: any;
+    };
+    operatingHours?: OperatingHours;
+    [key: string]: any;
+}
+
+export interface ContactInfo {
+    email: string;
+    phone?: string;
+    address?: string;
+}
+
+export interface OperatingHours {
+    [key: string]: {
+        open: string;
+        close: string;
+    };
+}
+
+// Order related types
+export interface Order extends BaseEntity {
+    serviceId: string;
+    vendorId: string;
+    customerId: string;
+    status: OrderStatus;
+    items: OrderItem[];
+    totalAmount: number;
+    royaltyFee: number;
+    paymentStatus: PaymentStatus;
+    paymentMethod: string;
+    paymentDetails?: any;
+    metadata: {
+        [key: string]: any;
+    };
+}
+
+export interface OrderItem {
+    id: string;
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+    options?: {
+        [key: string]: any;
+    };
+}
+
+export enum OrderStatus {
+    PENDING = 'pending',
+    ACCEPTED = 'accepted',
+    PICKED_UP = 'picked_up',
+    IN_PROGRESS = 'in_progress',
+    COMPLETED = 'completed',
+    DELIVERED = 'delivered',
+    CANCELLED = 'cancelled'
+}
+
+export enum PaymentStatus {
+    PENDING = 'pending',
+    AUTHORIZED = 'authorized',
+    PAID = 'paid',
+    FAILED = 'failed',
+    REFUNDED = 'refunded'
+}
+
+// Payment related types
+export interface PaymentProvider extends BaseEntity {
+    name: string;
+    isActive: boolean;
+    config: any;
+    processPayment(order: Order): Promise<PaymentResult>;
+    getPaymentStatus(transactionId: string): Promise<PaymentStatus>;
+    processRefund(order: Order, amount?: number): Promise<RefundResult>;
+}
+
+export interface PaymentResult {
+    success: boolean;
+    transactionId?: string;
+    error?: string;
+    details?: any;
+}
+
+export interface RefundResult {
+    success: boolean;
+    refundId?: string;
+    error?: string;
+    details?: any;
+}
+
+// Customer related types
+export interface Customer extends BaseEntity {
+    name: string;
+    email: string;
+    phone?: string;
+    room?: string;
+    preferences?: {
+        [key: string]: any;
+    };
+    paymentMethods?: SavedPaymentMethod[];
+}
+
+export interface SavedPaymentMethod {
+    id: string;
+    type: string;
+    lastFour?: string;
+    expiryDate?: string;
+    isDefault: boolean;
 }
