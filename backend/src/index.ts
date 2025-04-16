@@ -5,7 +5,7 @@ import path from 'path';
 import morgan from 'morgan';
 import { LaundryService } from './services/laundry/laundry.service';
 import { StripePaymentProvider } from './payments/stripe.provider';
-import { Service, Vendor, PaymentProvider } from './types';
+import { Service, Vendor, PaymentProvider, ServiceType } from './types';
 
 // Debug logging
 console.log('Starting server with debug info:');
@@ -86,10 +86,23 @@ function initializeServices() {
         name: "Angie's Laundry",
         description: 'Professional laundry service',
         isActive: true,
-        services: ['laundry'],
+        services: [ServiceType.LAUNDRY],
         royaltyRate: 0.15,
         paymentMethods: ['stripe'],
-        config: {}
+        config: {
+            operatingHours: {
+                monday: { open: '08:00', close: '20:00' },
+                tuesday: { open: '08:00', close: '20:00' },
+                wednesday: { open: '08:00', close: '20:00' },
+                thursday: { open: '08:00', close: '20:00' },
+                friday: { open: '08:00', close: '20:00' }
+            }
+        },
+        contactInfo: {
+            email: 'info@angieslaundry.com'
+        },
+        createdAt: new Date(),
+        updatedAt: new Date()
     };
 
     const laundryService = new LaundryService({
@@ -99,7 +112,15 @@ function initializeServices() {
             description: 'Professional laundry service',
             isActive: true,
             basePrice: 15,
-            config: {}
+            type: ServiceType.LAUNDRY,
+            config: {
+                allowedPaymentMethods: ['stripe'],
+                pricing: {
+                    base: 15
+                }
+            },
+            createdAt: new Date(),
+            updatedAt: new Date()
         },
         vendor: vendors['angie'],
         paymentProvider: stripeProvider
@@ -145,7 +166,7 @@ app.get('/api/vendors', (req, res) => {
 app.post('/api/orders', async (req, res) => {
     console.log('POST /api/orders - Creating order:', req.body);
     try {
-        const { serviceId, paymentMethodId, ...orderData } = req.body;
+        const { serviceId, paymentMethod, ...orderData } = req.body;
         const service = services[serviceId];
 
         if (!service) {
@@ -155,7 +176,7 @@ app.post('/api/orders', async (req, res) => {
 
         const order = await service.createOrder({
             ...orderData,
-            paymentMethodId
+            paymentMethod
         });
 
         console.log('Order created:', order.id);

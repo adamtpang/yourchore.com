@@ -1,15 +1,22 @@
 import { BaseService } from '../base.service';
-import { Service, Order, ServiceConfig, OrderStatus } from '../../types';
+import { Service, Order, ServiceConfig, OrderStatus, PaymentStatus } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
 
-export class LaundryService implements BaseService {
-  private config: ServiceConfig;
+// Create a custom config interface for LaundryService
+interface LaundryServiceConfig {
+  service: Service;
+  vendor: any; // Using any temporarily, should be properly typed
+  paymentProvider: any; // Using any temporarily, should be properly typed
+}
 
-  constructor(config: ServiceConfig) {
+export class LaundryService implements BaseService {
+  private config: LaundryServiceConfig;
+
+  constructor(config: LaundryServiceConfig) {
     this.config = config;
   }
 
-  getConfig(): ServiceConfig {
+  getConfig(): LaundryServiceConfig {
     return this.config;
   }
 
@@ -18,10 +25,13 @@ export class LaundryService implements BaseService {
       id: uuidv4(),
       serviceId: this.config.service.id,
       vendorId: this.config.vendor.id,
-      paymentMethodId: data.paymentMethodId!,
+      paymentMethod: data.paymentMethod!,
       status: OrderStatus.PENDING,
       totalAmount: await this.calculatePrice(data),
       royaltyFee: 0, // Will be calculated based on vendor's royalty rate
+      paymentStatus: PaymentStatus.PENDING,
+      items: [],
+      customerId: data.customerId || 'guest',
       metadata: data.metadata || {},
       createdAt: new Date(),
       updatedAt: new Date()
