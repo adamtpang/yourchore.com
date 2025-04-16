@@ -15,6 +15,14 @@ export interface ChoreOrder {
     metadata?: Record<string, any>;
 }
 
+// Define legacy status types for migration purposes
+type LegacyOrderStatus = 'Pending' | 'In Progress' | 'Completed';
+
+// Interface that allows for legacy status values during migration
+interface LegacyOrder extends Omit<ChoreOrder, 'status'> {
+    status: LegacyOrderStatus | ChoreOrder['status'];
+}
+
 class OrderRepository {
     private orders: ChoreOrder[] = [];
     private readonly filePath: string;
@@ -35,17 +43,18 @@ class OrderRepository {
             // Load existing orders if file exists
             if (fs.existsSync(this.filePath)) {
                 const data = fs.readFileSync(this.filePath, 'utf8');
-                this.orders = JSON.parse(data);
+                const loadedOrders = JSON.parse(data) as LegacyOrder[];
+
                 // Migrate any old status values
-                this.orders = this.orders.map(order => {
+                this.orders = loadedOrders.map(order => {
                     // Handle legacy status values
                     if (order.status === 'In Progress') {
-                        return { ...order, status: 'Picked Up' };
+                        return { ...order, status: 'Picked Up' as const };
                     }
                     if (order.status === 'Completed') {
-                        return { ...order, status: 'Delivered' };
+                        return { ...order, status: 'Delivered' as const };
                     }
-                    return order;
+                    return order as ChoreOrder;
                 });
             } else {
                 // Create empty file if it doesn't exist
