@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { api } from '../../utils/api';
 
 interface Order {
     id: string;
-    name: string;
-    roomNumber: string;
-    laundryType: string;
-    paymentMethod: string;
+    metadata: {
+        name: string;
+        roomNumber: string;
+    };
+    serviceType: string;
     status: string;
-    basePrice: number;
-    royaltyFee: number;
+    createdAt: string;
 }
 
 const DashboardPage: React.FC = () => {
@@ -17,15 +18,15 @@ const DashboardPage: React.FC = () => {
 
     useEffect(() => {
         fetchOrders();
+        // Poll for new orders every 30 seconds
+        const interval = setInterval(fetchOrders, 30000);
+        return () => clearInterval(interval);
     }, []);
 
     const fetchOrders = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/orders');
-            if (response.ok) {
-                const data = await response.json();
-                setOrders(data);
-            }
+            const response = await api.get('/api/orders');
+            setOrders(response.data);
         } catch (error) {
             console.error('Error fetching orders:', error);
         } finally {
@@ -35,16 +36,12 @@ const DashboardPage: React.FC = () => {
 
     const updateOrderStatus = async (orderId: string, newStatus: string) => {
         try {
-            const response = await fetch(`http://localhost:5000/api/orders/${orderId}/status`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ status: newStatus }),
+            const response = await api.put(`/api/orders/${orderId}/status`, {
+                status: newStatus
             });
 
-            if (response.ok) {
-                fetchOrders(); // Refresh the orders list
+            if (response.status === 200) {
+                fetchOrders();
             }
         } catch (error) {
             console.error('Error updating order status:', error);
@@ -60,62 +57,58 @@ const DashboardPage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-7xl mx-auto">
-                <div className="text-center mb-8">
-                    <h2 className="text-3xl font-extrabold text-gray-900">Order Dashboard</h2>
-                    <p className="mt-2 text-sm text-gray-600">
-                        Manage and track all laundry orders
-                    </p>
-                </div>
+        <div className="min-h-screen bg-gray-50 py-8 px-4">
+            <div className="max-w-4xl mx-auto">
+                <div className="bg-white rounded-lg shadow-sm">
+                    <div className="px-4 py-5 border-b border-gray-200 sm:px-6">
+                        <h2 className="text-lg font-medium text-gray-900">
+                            Today's Orders
+                        </h2>
+                    </div>
 
-                <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                    <ul className="divide-y divide-gray-200">
-                        {orders.map((order) => (
-                            <li key={order.id} className="px-6 py-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex-1">
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-sm font-medium text-indigo-600 truncate">
-                                                {order.name}
+                    <div className="divide-y divide-gray-200">
+                        {orders.length === 0 ? (
+                            <p className="p-4 text-center text-gray-500">No orders yet</p>
+                        ) : (
+                            orders.map((order) => (
+                                <div key={order.id} className="p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-sm font-medium text-gray-900">
+                                                {order.metadata.name}
+                                            </h3>
+                                            <p className="text-sm text-gray-500">
+                                                Room {order.metadata.roomNumber}
                                             </p>
-                                            <div className="ml-2 flex-shrink-0 flex">
-                                                <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                                    Room {order.roomNumber}
-                                                </p>
-                                            </div>
+                                            <p className="text-xs text-gray-400 mt-1">
+                                                {new Date(order.createdAt).toLocaleString()}
+                                            </p>
                                         </div>
-                                        <div className="mt-2 sm:flex sm:justify-between">
-                                            <div className="sm:flex">
-                                                <p className="flex items-center text-sm text-gray-500">
-                                                    {order.laundryType} Service
-                                                </p>
-                                                <p className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
-                                                    Via {order.paymentMethod}
-                                                </p>
-                                            </div>
-                                            <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                                                <p>
-                                                    ${order.basePrice.toFixed(2)} + ${order.royaltyFee.toFixed(2)} fee
-                                                </p>
-                                            </div>
+
+                                        <div className="flex items-center space-x-4">
+                                            <select
+                                                className="block w-40 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                                                value={order.status}
+                                                onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                                            >
+                                                <option value="pending">Pending</option>
+                                                <option value="picked_up">Picked Up</option>
+                                                <option value="delivered">Delivered</option>
+                                            </select>
+
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                ${order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                                                    order.status === 'picked_up' ? 'bg-yellow-100 text-yellow-800' :
+                                                        'bg-gray-100 text-gray-800'}`}
+                                            >
+                                                {order.status}
+                                            </span>
                                         </div>
-                                    </div>
-                                    <div className="ml-6">
-                                        <select
-                                            className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                                            value={order.status}
-                                            onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                                        >
-                                            <option value="pending">Pending</option>
-                                            <option value="picked_up">Picked Up</option>
-                                            <option value="delivered">Delivered</option>
-                                        </select>
                                     </div>
                                 </div>
-                            </li>
-                        ))}
-                    </ul>
+                            ))
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import axios from 'axios'
 import { CreditCardIcon, CurrencyDollarIcon, CheckCircleIcon, InformationCircleIcon } from '@heroicons/react/24/outline'
+import { api, createOrder } from '../utils/api'
 
 interface OrderFormData {
     name: string;
@@ -29,12 +29,12 @@ const Order = () => {
         setIsSubmitting(true);
 
         try {
-            const response = await axios.post('http://localhost:5000/api/orders', {
+            const response = await createOrder({
                 ...formData,
                 amount: FIXED_AMOUNT
             });
 
-            if (response.data) {
+            if (response) {
                 setShowConfirmation(true);
 
                 // Set payment-specific messages
@@ -132,8 +132,8 @@ const Order = () => {
                                 type="button"
                                 onClick={() => setFormData(prev => ({ ...prev, paymentMethod: 'stripe' }))}
                                 className={`relative flex items-center justify-center rounded-lg border-2 p-4 transition-all duration-200 ${formData.paymentMethod === 'stripe'
-                                        ? 'border-primary-500 bg-primary-50 text-primary-700'
-                                        : 'border-gray-300 hover:border-gray-400'
+                                    ? 'border-primary-500 bg-primary-50 text-primary-700'
+                                    : 'border-gray-300 hover:border-gray-400'
                                     }`}
                             >
                                 <CreditCardIcon className="h-6 w-6 mr-2" />
@@ -144,8 +144,8 @@ const Order = () => {
                                 type="button"
                                 onClick={() => setFormData(prev => ({ ...prev, paymentMethod: 'nowpayments' }))}
                                 className={`relative flex items-center justify-center rounded-lg border-2 p-4 transition-all duration-200 ${formData.paymentMethod === 'nowpayments'
-                                        ? 'border-primary-500 bg-primary-50 text-primary-700'
-                                        : 'border-gray-300 hover:border-gray-400'
+                                    ? 'border-primary-500 bg-primary-50 text-primary-700'
+                                    : 'border-gray-300 hover:border-gray-400'
                                     }`}
                             >
                                 <CurrencyDollarIcon className="h-6 w-6 mr-2" />

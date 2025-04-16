@@ -1,8 +1,8 @@
-import { PaymentProvider } from '../types';
+import { PaymentProvider as PaymentProviderInterface } from '../types';
 import { PaymentProviderFactory } from './payment.factory';
 
 // Payment provider interface
-export interface PaymentProvider {
+export interface LocalPaymentProvider {
     name: string;
     isActive: boolean;
     processorKey: string;
@@ -32,7 +32,7 @@ export interface PaymentResponse {
 export class PaymentService {
     constructor() { }
 
-    private paymentProviders: PaymentProvider[] = [
+    private paymentProviders: LocalPaymentProvider[] = [
         {
             name: 'stripe',
             isActive: true,
@@ -51,7 +51,7 @@ export class PaymentService {
     ];
 
     // Get all active payment providers
-    public getActiveProviders(): PaymentProvider[] {
+    public getActiveProviders(): LocalPaymentProvider[] {
         return this.paymentProviders.filter(provider => provider.isActive);
     }
 
@@ -137,7 +137,7 @@ export class PaymentService {
         return provider.getPaymentStatus(paymentId);
     }
 
-    getAllProviders(): PaymentProvider[] {
+    getAllProviders(): PaymentProviderInterface[] {
         return PaymentProviderFactory.getAllProviders();
     }
 }

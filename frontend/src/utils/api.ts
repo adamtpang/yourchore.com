@@ -6,7 +6,7 @@ const baseURL = import.meta.env.PROD
     : 'http://localhost:5000';
 
 // Add retry logic and better error handling
-const api = axios.create({
+export const api = axios.create({
     baseURL,
     headers: {
         'Content-Type': 'application/json',

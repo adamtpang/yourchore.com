@@ -30,10 +30,17 @@ export class PaymentController {
                 return res.status(400).json({ error: 'Missing required fields' });
             }
 
-            const result = await this.paymentService.processPayment(providerId, amount, currency, metadata);
+            const paymentRequest = {
+                provider: providerId,
+                amount,
+                currency,
+                metadata
+            };
+
+            const result = await this.paymentService.processPayment(paymentRequest);
             res.json(result);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
         }
     }
 
@@ -43,7 +50,7 @@ export class PaymentController {
             const status = await this.paymentService.getPaymentStatus(providerId, paymentId);
             res.json(status);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
         }
     }
 
@@ -54,10 +61,10 @@ export class PaymentController {
                 return res.status(400).json({ error: 'Missing required fields' });
             }
 
-            const result = await this.paymentService.processRefund(providerId, paymentId, amount, reason);
+            const result = await this.paymentService.processRefund(paymentId, amount, reason);
             res.json(result);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
         }
     }
 
@@ -66,7 +73,7 @@ export class PaymentController {
             const providers = this.paymentService.getAllProviders();
             res.json(providers);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
         }
     }
 
@@ -75,7 +82,7 @@ export class PaymentController {
             const providers = this.paymentService.getActiveProviders();
             res.json(providers);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });
         }
     }
 }
