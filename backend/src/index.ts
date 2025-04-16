@@ -3,9 +3,12 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import morgan from 'morgan';
+import Stripe from 'stripe';
+import { v4 as uuidv4 } from 'uuid';
 import { LaundryService } from './services/laundry/laundry.service';
 import { StripePaymentProvider } from './payments/stripe.provider';
 import { Service, Vendor, PaymentProvider, ServiceType } from './types';
+import { orderRepository, ChoreOrder } from './orders/order-repository';
 
 // Debug logging
 console.log('Starting server with debug info:');
@@ -32,7 +35,12 @@ app.use(cors({
     origin: ['http://localhost:5173', 'https://yourchore.com', 'https://yourchorecom-production.up.railway.app'],
     credentials: true
 }));
+
+// For regular JSON requests
 app.use(express.json());
+
+// For Stripe webhooks (raw buffer)
+app.use('/api/stripe-webhook', express.raw({ type: 'application/json' }));
 app.use(morgan('dev'));
 
 // Error handling middleware
@@ -50,7 +58,10 @@ app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
     console.log('Headers:', req.headers);
     console.log('Query:', req.query);
-    console.log('Body:', req.body);
+    if (req.method !== 'POST' || req.path !== '/api/stripe-webhook') {
+        // Don't log body for Stripe webhooks to avoid leaking sensitive data
+        console.log('Body:', req.body);
+    }
     next();
 });
 
@@ -187,6 +198,121 @@ app.post('/api/orders', async (req, res) => {
             error: error instanceof Error ? error.message : 'Unknown error'
         });
     }
+});
+
+// Stripe webhook endpoint for handling checkout sessions
+app.post('/api/stripe-webhook', async (req, res) => {
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+        apiVersion: '2022-11-15',
+    });
+
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+        console.error('Stripe webhook secret is not configured');
+        return res.status(500).json({ error: 'Webhook secret not configured' });
+    }
+
+    const sig = req.headers['stripe-signature'] as string;
+    let event: Stripe.Event;
+
+    try {
+        // Verify webhook signature
+        event = stripe.webhooks.constructEvent(
+            req.body,
+            sig,
+            webhookSecret
+        );
+    } catch (err) {
+        console.error('Webhook signature verification failed:', err);
+        return res.status(400).json({ error: 'Webhook signature verification failed' });
+    }
+
+    // Handle the checkout.session.completed event
+    if (event.type === 'checkout.session.completed') {
+        try {
+            const session = event.data.object as Stripe.Checkout.Session;
+            console.log('Payment succeeded:', session);
+
+            // Extract customer information
+            let customerName = 'Guest';
+            let roomNumber = 'Not specified';
+
+            if (session.customer_details) {
+                customerName = session.customer_details.name || 'Guest';
+            }
+
+            // Extract service information and metadata
+            if (session.metadata) {
+                roomNumber = session.metadata.room || 'Not specified';
+            }
+
+            // Get payment details
+            const amountPaid = session.amount_total ? session.amount_total / 100 : 0; // Convert from cents
+            const royaltyFee = amountPaid * 0.10; // 10% royalty
+
+            // Create a new order
+            const newOrder: ChoreOrder = {
+                id: uuidv4(),
+                name: customerName,
+                room: roomNumber,
+                service: '14kg Mixed Load', // Default service
+                time: new Date().toISOString(),
+                amountPaid,
+                royalty: royaltyFee,
+                status: 'Pending',
+                paymentMethod: 'stripe',
+                metadata: {
+                    stripeSessionId: session.id,
+                    paymentIntent: session.payment_intent,
+                    customerEmail: session.customer_details?.email
+                }
+            };
+
+            // Store the order
+            orderRepository.addOrder(newOrder);
+            console.log('Order stored:', newOrder);
+
+            res.json({ received: true, orderId: newOrder.id });
+        } catch (error) {
+            console.error('Error processing webhook:', error);
+            res.status(500).json({ error: 'Error processing webhook' });
+        }
+    } else {
+        // Handle other event types
+        console.log(`Unhandled event type: ${event.type}`);
+        res.json({ received: true });
+    }
+});
+
+// Get all orders - for admin dashboard
+app.get('/api/orders', (req, res) => {
+    try {
+        const orders = orderRepository.getOrders();
+        res.json(orders);
+    } catch (error) {
+        console.error('Error fetching orders:', error);
+        res.status(500).json({
+            error: 'Error fetching orders',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+});
+
+// Update order status
+app.put('/api/orders/:id/status', (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status || !['Pending', 'Picked Up', 'Delivered'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status. Valid values are: Pending, Picked Up, Delivered' });
+    }
+
+    const updatedOrder = orderRepository.updateOrderStatus(id, status);
+    if (!updatedOrder) {
+        return res.status(404).json({ error: 'Order not found' });
+    }
+
+    res.json(updatedOrder);
 });
 
 // Health check endpoint
