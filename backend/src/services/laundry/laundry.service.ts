@@ -16,8 +16,8 @@ export class LaundryService implements BaseService {
     this.config = config;
   }
 
-  getConfig(): LaundryServiceConfig {
-    return this.config;
+  getConfig(): ServiceConfig {
+    return this.config.service.config;
   }
 
   async createOrder(data: Partial<Order>): Promise<Order> {
