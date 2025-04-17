@@ -1,10 +1,28 @@
 import axios from 'axios';
 
+// Determine the base URL based on environment
+const getBaseUrl = () => {
+    if (process.env.NODE_ENV === 'production') {
+        // Default to Railway production URL
+        const productionUrl = 'https://yourchorecom-production.up.railway.app';
+
+        // Check if we're on the same domain as the API
+        if (window.location.hostname === 'yourchore.com' ||
+            window.location.hostname === 'www.yourchore.com') {
+            // When deployed together, we can use relative URLs
+            return '';
+        }
+
+        return productionUrl;
+    }
+
+    // In development, use relative URLs to the dev server
+    return '';
+};
+
 // Create a base API instance with proper configuration
 export const api = axios.create({
-    baseURL: process.env.NODE_ENV === 'production'
-        ? 'https://yourchorecom-production.up.railway.app'
-        : '',
+    baseURL: getBaseUrl(),
     headers: {
         'Content-Type': 'application/json',
     },
@@ -30,7 +48,24 @@ api.interceptors.response.use(
         return response;
     },
     (error) => {
-        console.error('API Error:', error.response || error);
+        if (error.response) {
+            // The request was made and the server responded with a non-2xx status
+            console.error('API Error Response:', {
+                status: error.response.status,
+                data: error.response.data,
+                headers: error.response.headers
+            });
+        } else if (error.request) {
+            // The request was made but no response was received
+            console.error('API Error: No response received', error.request);
+            // Check if this might be a CORS error
+            if (error.message && error.message.includes('Network Error')) {
+                console.error('This may be a CORS issue - check that the server allows requests from this origin');
+            }
+        } else {
+            // Something happened in setting up the request that triggered an Error
+            console.error('API Error Setup:', error.message);
+        }
         return Promise.reject(error);
     }
 );

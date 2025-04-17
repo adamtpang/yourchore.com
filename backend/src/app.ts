@@ -14,22 +14,61 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Configure CORS to allow requests from frontend
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://127.0.0.1:5173'
-];
-
+// Middleware
 app.use(cors({
-    origin: allowedOrigins,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    origin: function (origin, callback) {
+        const allowedOrigins = [
+            'http://localhost:5173',
+            'http://localhost:3000',
+            'https://yourchore.com',
+            'https://www.yourchore.com',
+            'https://yourchorecom-production.up.railway.app'
+        ];
+
+        // Allow requests with no origin (like mobile apps, curl, etc.)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+            callback(null, true);
+        } else {
+            console.warn(`Origin ${origin} not allowed by CORS`);
+            callback(null, true); // Allow anyway for now to debug
+        }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
 
 // Middleware - Note: this needs to come before the Stripe webhook middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Debug middleware - Place after CORS middleware to avoid interfering with OPTIONS requests
+app.use((req, res, next) => {
+    // Log basic request info
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+
+    // Log origin information for debugging CORS
+    if (process.env.NODE_ENV === 'production') {
+        console.log('Request origin:', req.headers.origin);
+        console.log('Request host:', req.headers.host);
+        console.log('CORS headers in response:', {
+            'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
+            'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials'),
+            'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods')
+        });
+    }
+
+    // Log detailed info for non-webhook requests
+    if (req.method !== 'POST' || req.path !== '/api/stripe-webhook') {
+        console.log('Headers:', req.headers);
+        console.log('Query:', req.query);
+        console.log('Body:', req.body);
+    }
+
+    next();
+});
 
 // Health check endpoint
 app.get('/health', (_, res) => {
