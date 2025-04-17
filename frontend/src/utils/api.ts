@@ -3,17 +3,8 @@ import axios from 'axios';
 // Determine the base URL based on environment
 const getBaseUrl = () => {
     if (process.env.NODE_ENV === 'production') {
-        // Default to Railway production URL
-        const productionUrl = 'https://yourchorecom-production.up.railway.app';
-
-        // Check if we're on the same domain as the API
-        if (window.location.hostname === 'yourchore.com' ||
-            window.location.hostname === 'www.yourchore.com') {
-            // When deployed together, we can use relative URLs
-            return '';
-        }
-
-        return productionUrl;
+        // Always use the Railway production URL in production
+        return 'https://yourchorecom-production.up.railway.app';
     }
 
     // In development, use relative URLs to the dev server

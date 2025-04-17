@@ -23,7 +23,8 @@ app.use(cors({
             'http://localhost:3000',
             'https://yourchore.com',
             'https://www.yourchore.com',
-            'https://yourchorecom-production.up.railway.app'
+            'https://yourchorecom-production.up.railway.app',
+            'https://yourchore.vercel.app'
         ];
 
         // Allow requests with no origin (like mobile apps, curl, etc.)
@@ -32,7 +33,7 @@ app.use(cors({
         if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
             callback(null, true);
         } else {
-            console.warn(`Origin ${origin} not allowed by CORS`);
+            console.warn(`Origin ${origin} not allowed by CORS: ${origin}`);
             callback(null, true); // Allow anyway for now to debug
         }
     },
