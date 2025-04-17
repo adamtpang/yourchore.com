@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import Stripe from 'stripe';
 import { OrderService } from './orders/order.service';
 import { OrderStatus } from './types';
+import path from 'path';
 
 // Load environment variables
 dotenv.config();
@@ -189,9 +190,43 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
 app.use('/api/payments', paymentController.getRouter());
 app.use('/api/orders', orderController.getRouter());
 
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({ error: 'Not Found' });
+// Serve static files from the frontend build directory
+const staticPath = path.resolve(__dirname, '../../frontend/dist');
+console.log(`Serving static files from: ${staticPath}`);
+
+// Check if the static directory exists
+try {
+    const fs = require('fs');
+    if (fs.existsSync(staticPath)) {
+        console.log(`Static directory ${staticPath} exists`);
+    } else {
+        console.warn(`Static directory ${staticPath} does not exist!`);
+    }
+} catch (error) {
+    console.error(`Error checking static directory: ${error}`);
+}
+
+app.use(express.static(staticPath));
+
+// Replace the 404 handler with a client-side routing handler
+// Handle client-side routing - serve index.html for all non-API routes
+app.get('*', (req, res) => {
+    // If path starts with /api, it should have been handled by API routes above
+    if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'API endpoint not found' });
+    }
+
+    // For all other routes, serve the main index.html
+    // This enables client-side routing to work properly
+    const indexPath = path.join(staticPath, 'index.html');
+    console.log(`Serving index.html from ${indexPath} for path: ${req.path}`);
+
+    res.sendFile(indexPath, (err) => {
+        if (err) {
+            console.error(`Error serving index.html: ${err}`);
+            res.status(500).send('Error serving index.html file');
+        }
+    });
 });
 
 // Error handling middleware
