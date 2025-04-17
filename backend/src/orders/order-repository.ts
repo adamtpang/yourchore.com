@@ -1,107 +1,121 @@
+import { Order } from '../types';
 import fs from 'fs';
 import path from 'path';
 
-// Define the order structure for our simple MVP
-export interface ChoreOrder {
-    id: string;
-    name: string;
-    room: string;
-    service: string;
-    time: string;
-    amountPaid: number;
-    royalty: number;
-    status: 'Pending' | 'Picked Up' | 'Delivered';
-    paymentMethod: string;
-    metadata?: Record<string, any>;
-}
-
-// Define legacy status types for migration purposes
-type LegacyOrderStatus = 'Pending' | 'In Progress' | 'Completed';
-
-// Interface that allows for legacy status values during migration
-interface LegacyOrder extends Omit<ChoreOrder, 'status'> {
-    status: LegacyOrderStatus | ChoreOrder['status'];
-}
-
-class OrderRepository {
-    private orders: ChoreOrder[] = [];
-    private readonly filePath: string;
+/**
+ * A simple file-based repository for storing orders
+ * In a production environment, this would be replaced with a database
+ */
+export class OrderRepository {
+    private orders: Order[] = [];
+    private readonly dataFile: string;
 
     constructor() {
-        this.filePath = path.join(__dirname, '../../../data/orders.json');
-        this.loadOrders();
-    }
+        // Use a data directory in the project root
+        const dataDir = path.join(__dirname, '../../data');
 
-    private loadOrders(): void {
+        // Create the directory if it doesn't exist
+        if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+        }
+
+        this.dataFile = path.join(dataDir, 'orders.json');
+
+        // Load existing orders if the file exists
         try {
-            // Ensure directory exists
-            const dir = path.dirname(this.filePath);
-            if (!fs.existsSync(dir)) {
-                fs.mkdirSync(dir, { recursive: true });
-            }
-
-            // Load existing orders if file exists
-            if (fs.existsSync(this.filePath)) {
-                const data = fs.readFileSync(this.filePath, 'utf8');
-                const loadedOrders = JSON.parse(data) as LegacyOrder[];
-
-                // Migrate any old status values
-                this.orders = loadedOrders.map(order => {
-                    // Handle legacy status values
-                    if (order.status === 'In Progress') {
-                        return { ...order, status: 'Picked Up' as const };
-                    }
-                    if (order.status === 'Completed') {
-                        return { ...order, status: 'Delivered' as const };
-                    }
-                    return order as ChoreOrder;
-                });
-            } else {
-                // Create empty file if it doesn't exist
-                fs.writeFileSync(this.filePath, JSON.stringify([], null, 2));
+            if (fs.existsSync(this.dataFile)) {
+                const data = fs.readFileSync(this.dataFile, 'utf8');
+                this.orders = JSON.parse(data);
+                console.log(`Loaded ${this.orders.length} orders from storage`);
             }
         } catch (error) {
-            console.error('Error loading orders:', error);
-            // Initialize with empty array if loading fails
+            console.error('Error loading orders from file:', error);
             this.orders = [];
         }
     }
 
+    /**
+     * Save the current orders to the data file
+     */
     private saveOrders(): void {
         try {
-            const dir = path.dirname(this.filePath);
-            if (!fs.existsSync(dir)) {
-                fs.mkdirSync(dir, { recursive: true });
-            }
-            fs.writeFileSync(this.filePath, JSON.stringify(this.orders, null, 2));
+            fs.writeFileSync(this.dataFile, JSON.stringify(this.orders, null, 2), 'utf8');
         } catch (error) {
-            console.error('Error saving orders:', error);
+            console.error('Error saving orders to file:', error);
         }
     }
 
-    public getOrders(): ChoreOrder[] {
-        return this.orders;
-    }
+    /**
+     * Create a new order
+     */
+    create(order: Order): Order {
+        // Check if order with same ID already exists
+        const existingIndex = this.orders.findIndex(o => o.id === order.id);
 
-    public getOrderById(id: string): ChoreOrder | undefined {
-        return this.orders.find(order => order.id === id);
-    }
+        if (existingIndex >= 0) {
+            // Update existing order
+            this.orders[existingIndex] = {
+                ...this.orders[existingIndex],
+                ...order,
+                updatedAt: new Date()
+            };
+        } else {
+            // Add new order
+            this.orders.push(order);
+        }
 
-    public addOrder(order: ChoreOrder): ChoreOrder {
-        this.orders.push(order);
         this.saveOrders();
         return order;
     }
 
-    public updateOrderStatus(id: string, status: ChoreOrder['status']): ChoreOrder | null {
-        const orderIndex = this.orders.findIndex(order => order.id === id);
-        if (orderIndex === -1) return null;
+    /**
+     * Find all orders
+     */
+    findAll(): Order[] {
+        return [...this.orders].sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+    }
 
-        this.orders[orderIndex].status = status;
+    /**
+     * Find an order by ID
+     */
+    findById(id: string): Order | undefined {
+        return this.orders.find(order => order.id === id);
+    }
+
+    /**
+     * Update an existing order
+     */
+    update(order: Order): Order {
+        const index = this.orders.findIndex(o => o.id === order.id);
+
+        if (index < 0) {
+            throw new Error(`Order with ID ${order.id} not found`);
+        }
+
+        this.orders[index] = {
+            ...this.orders[index],
+            ...order,
+            updatedAt: new Date()
+        };
+
         this.saveOrders();
-        return this.orders[orderIndex];
+        return this.orders[index];
+    }
+
+    /**
+     * Delete an order by ID
+     */
+    delete(id: string): boolean {
+        const initialLength = this.orders.length;
+        this.orders = this.orders.filter(order => order.id !== id);
+
+        if (this.orders.length !== initialLength) {
+            this.saveOrders();
+            return true;
+        }
+
+        return false;
     }
 }
-
-// Singleton instance
-export const orderRepository = new OrderRepository();

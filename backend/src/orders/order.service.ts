@@ -1,58 +1,57 @@
-import { v4 as uuidv4 } from 'uuid';
-import { Order, OrderStatus, PaymentStatus } from '../types';
+import { Order, OrderStatus } from '../types';
+import { OrderRepository } from './order-repository';
 
 export class OrderService {
-    private orders: Order[] = [];
+    private orderRepository: OrderRepository;
+
+    constructor() {
+        this.orderRepository = new OrderRepository();
+    }
 
     createOrder(orderData: Partial<Order>): Order {
+        // Validate required fields
+        if (!orderData.totalAmount && orderData.totalAmount !== 0) {
+            throw new Error('Total amount is required');
+        }
+
+        // Create a new order with defaults for missing fields
         const order: Order = {
-            id: uuidv4(),
-            serviceId: 'laundry',
-            vendorId: orderData.vendorId || 'angie',
-            customerId: orderData.customerId || uuidv4(), // In MVP, we're not tracking customers
-            status: OrderStatus.PENDING,
-            items: [],
-            totalAmount: orderData.totalAmount || 0,
-            royaltyFee: orderData.royaltyFee || 0,
-            paymentStatus: PaymentStatus.PENDING,
-            paymentMethod: orderData.paymentMethod || 'stripe',
-            metadata: {
-                name: orderData.metadata?.name,
-                roomNumber: orderData.metadata?.roomNumber,
-                laundryType: orderData.metadata?.laundryType,
-                ...orderData.metadata
-            },
+            id: orderData.id || `order_${Date.now()}`,
+            totalAmount: orderData.totalAmount,
+            royaltyFee: orderData.royaltyFee || orderData.totalAmount * 0.1,
+            status: orderData.status || OrderStatus.PENDING,
+            time: orderData.time || new Date().toISOString(),
             createdAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
+            name: orderData.name || 'Unknown',
+            room: orderData.room || 'Unknown',
+            service: orderData.service || 'Laundry Service',
+            amountPaid: orderData.amountPaid || orderData.totalAmount,
+            tipAmount: orderData.tipAmount || 0,
+            paymentMethod: orderData.paymentMethod || 'cash',
+            metadata: orderData.metadata || {}
         };
 
-        this.orders.push(order);
-        return order;
+        return this.orderRepository.create(order);
     }
 
     getOrders(): Order[] {
-        return this.orders;
+        return this.orderRepository.findAll();
     }
 
-    getOrderById(orderId: string): Order | undefined {
-        return this.orders.find(order => order.id === orderId);
+    getOrderById(id: string): Order | undefined {
+        return this.orderRepository.findById(id);
     }
 
-    updateOrderStatus(orderId: string, status: OrderStatus): Order | undefined {
-        const order = this.orders.find(order => order.id === orderId);
-        if (order) {
-            order.status = status;
-            order.updatedAt = new Date();
+    updateOrderStatus(id: string, status: OrderStatus): Order | undefined {
+        const order = this.orderRepository.findById(id);
+        if (!order) {
+            return undefined;
         }
-        return order;
-    }
 
-    updatePaymentStatus(orderId: string, status: PaymentStatus): Order | undefined {
-        const order = this.orders.find(order => order.id === orderId);
-        if (order) {
-            order.paymentStatus = status;
-            order.updatedAt = new Date();
-        }
-        return order;
+        order.status = status;
+        order.updatedAt = new Date();
+
+        return this.orderRepository.update(order);
     }
 }

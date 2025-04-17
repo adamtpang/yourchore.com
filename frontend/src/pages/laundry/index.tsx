@@ -1,13 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../utils/api';
+import { v4 as uuidv4 } from 'uuid';
 
 const STORAGE_KEY = 'yourchoreUser';
+
+// Service options with corresponding Stripe payment links
+const serviceOptions = [
+    {
+        value: 'Mixed Wash & Dry (14kgs)',
+        price: 28,
+        description: 'Dark & White - 14kgs/load',
+        stripeLink: 'https://buy.stripe.com/3cseXHdDdaMOdUYcMT'
+    },
+    {
+        value: 'Mixed Wash & Dry (28kgs)',
+        price: 52,
+        description: 'Dark & White - 28kgs/load',
+        stripeLink: 'https://buy.stripe.com/3cseXHdDdaMOdUYcMT' // Replace with actual link for this service
+    },
+    {
+        value: 'Separated Wash & Dry',
+        price: 52,
+        description: 'Dark or White - 2 x 14kgs/load',
+        stripeLink: 'https://buy.stripe.com/3cseXHdDdaMOdUYcMT' // Replace with actual link for this service
+    },
+    {
+        value: 'Duvet Wash',
+        price: 35,
+        description: 'Single duvet washing service',
+        stripeLink: 'https://buy.stripe.com/3cseXHdDdaMOdUYcMT' // Replace with actual link for this service
+    },
+];
 
 const LaundryPage: React.FC = () => {
     const [formData, setFormData] = useState({
         name: '',
         roomNumber: '',
     });
+    const [selectedService, setSelectedService] = useState(serviceOptions[0]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isReturningUser, setIsReturningUser] = useState(false);
 
@@ -38,30 +68,49 @@ const LaundryPage: React.FC = () => {
         }));
     };
 
+    const handleServiceSelect = (service: typeof serviceOptions[0]) => {
+        setSelectedService(service);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
 
         try {
+            // Generate a unique order reference
+            const orderReference = uuidv4();
+
             // Save user data to localStorage
             localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
 
-            // Store order in backend
-            const response = await api.post('/api/orders', {
-                ...formData,
-                serviceType: '14kg_mixed',
+            // Store order details in localStorage for use on the thank you page
+            const orderDetails = {
+                orderReference,
+                name: formData.name,
+                room: formData.roomNumber,
+                service: selectedService.value,
+                price: selectedService.price,
                 paymentMethod: 'stripe',
-                basePrice: 28.00,
-                royaltyFee: 2.80, // 10% royalty
+                time: new Date().toISOString(),
+                royalty: selectedService.price * 0.1 // 10% of service price
+            };
+            localStorage.setItem('pendingOrder', JSON.stringify(orderDetails));
+
+            // Create order in our backend
+            await api.post('/api/orders', {
+                name: formData.name,
+                room: formData.roomNumber,
+                service: selectedService.value,
+                paymentMethod: 'stripe',
+                basePrice: selectedService.price,
+                royaltyFee: selectedService.price * 0.1, // 10% royalty
+                orderReference
             });
 
-            if (response.status === 201) {
-                // Redirect to Stripe payment link
-                window.location.href = 'https://buy.stripe.com/3cseXHdDdaMOdUYcMT';
-            } else {
-                throw new Error('Failed to submit order');
-            }
+            // Redirect to the appropriate Stripe payment link
+            window.location.href = selectedService.stripeLink;
         } catch (error) {
+            console.error('Error submitting order:', error);
             alert('Error submitting order. Please try again.');
             setIsSubmitting(false);
         }
@@ -85,16 +134,34 @@ const LaundryPage: React.FC = () => {
                 </div>
 
                 <div className="bg-white rounded-2xl shadow-lg p-8">
-                    <div className="mb-8 flex items-center">
-                        <div className="w-12 h-12 flex-shrink-0 bg-indigo-100 rounded-full flex items-center justify-center">
-                            <span className="text-xl">🧺</span>
-                        </div>
-                        <div className="ml-4">
-                            <h2 className="font-semibold text-gray-900">14kg Mixed Load</h2>
-                            <div className="flex items-center mt-1">
-                                <span className="font-medium text-indigo-600">RM28</span>
-                                <span className="ml-2 text-sm text-gray-500">per load</span>
-                            </div>
+                    <div className="mb-6">
+                        <h2 className="text-lg font-medium text-gray-900 mb-4">Select Service</h2>
+                        <div className="space-y-3">
+                            {serviceOptions.map((service) => (
+                                <div
+                                    key={service.value}
+                                    className={`p-4 border rounded-xl cursor-pointer transition-all ${selectedService.value === service.value
+                                            ? 'border-indigo-500 bg-indigo-50'
+                                            : 'border-gray-200 hover:border-indigo-300'
+                                        }`}
+                                    onClick={() => handleServiceSelect(service)}
+                                >
+                                    <div className="flex items-center">
+                                        <input
+                                            type="radio"
+                                            name="service"
+                                            checked={selectedService.value === service.value}
+                                            onChange={() => handleServiceSelect(service)}
+                                            className="h-4 w-4 text-indigo-600"
+                                        />
+                                        <div className="ml-3 flex-grow">
+                                            <div className="font-medium text-gray-900">{service.value}</div>
+                                            <div className="text-sm text-gray-500">{service.description}</div>
+                                        </div>
+                                        <div className="text-indigo-600 font-medium">RM{service.price}</div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
 
@@ -151,6 +218,38 @@ const LaundryPage: React.FC = () => {
                             />
                         </div>
 
+                        <div className="pt-2">
+                            <div className="mb-4">
+                                <div className="flex items-center">
+                                    <input
+                                        type="radio"
+                                        id="stripe-payment"
+                                        name="paymentMethod"
+                                        checked={true}
+                                        readOnly
+                                        className="h-4 w-4 text-indigo-600"
+                                    />
+                                    <label htmlFor="stripe-payment" className="ml-2 text-sm font-medium text-gray-700">
+                                        Pay Online (Stripe)
+                                    </label>
+                                </div>
+                            </div>
+                            <div>
+                                <div className="flex items-center opacity-50">
+                                    <input
+                                        type="radio"
+                                        id="rozo-payment"
+                                        name="paymentMethod"
+                                        disabled
+                                        className="h-4 w-4 text-indigo-600"
+                                    />
+                                    <label htmlFor="rozo-payment" className="ml-2 text-sm font-medium text-gray-500">
+                                        Pay with Rozo (Coming Soon)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="pt-4">
                             <button
                                 type="submit"
@@ -165,7 +264,7 @@ const LaundryPage: React.FC = () => {
                                         </svg>
                                         Processing...
                                     </div>
-                                ) : "I've dropped my bag – Pay now"}
+                                ) : `I've dropped my bag – Pay RM${selectedService.price}`}
                             </button>
                         </div>
                     </form>

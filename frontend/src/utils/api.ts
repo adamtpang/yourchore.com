@@ -1,30 +1,36 @@
 import axios from 'axios';
 
-// Always use the Railway URL in production, local proxy in development
-const baseURL = import.meta.env.PROD
-    ? 'https://yourchorecom-production.up.railway.app'
-    : 'http://localhost:5000';
-
-// Add retry logic and better error handling
+// Create a base API instance with proper configuration
 export const api = axios.create({
-    baseURL,
+    baseURL: process.env.NODE_ENV === 'production'
+        ? 'https://yourchorecom-production.up.railway.app'
+        : '',
     headers: {
         'Content-Type': 'application/json',
     },
-    // Add timeout
-    timeout: 10000,
+    withCredentials: true,
 });
 
-// Add response interceptor for better error handling
+// Add request interceptor for debugging
+api.interceptors.request.use(
+    (config) => {
+        console.log(`API Request to ${config.url}:`, config);
+        return config;
+    },
+    (error) => {
+        console.error('API Request Error:', error);
+        return Promise.reject(error);
+    }
+);
+
+// Add response interceptor for error handling
 api.interceptors.response.use(
-    response => response,
-    error => {
-        console.error('API Error:', {
-            url: error.config?.url,
-            method: error.config?.method,
-            status: error.response?.status,
-            data: error.response?.data,
-        });
+    (response) => {
+        console.log(`API Response from ${response.config.url}:`, response);
+        return response;
+    },
+    (error) => {
+        console.error('API Error:', error.response || error);
         return Promise.reject(error);
     }
 );
@@ -56,6 +62,16 @@ export const createOrder = async (orderData: any) => {
         return response.data;
     } catch (error) {
         console.error('Error creating order:', error);
+        throw error;
+    }
+};
+
+export const createCheckoutSession = async (checkoutData: any) => {
+    try {
+        const response = await api.post('/api/create-checkout-session', checkoutData);
+        return response.data;
+    } catch (error) {
+        console.error('Error creating checkout session:', error);
         throw error;
     }
 };

@@ -32,7 +32,9 @@ const app = express();
 
 // Middleware
 app.use(cors({
-    origin: ['http://localhost:5173', 'https://yourchore.com', 'https://yourchorecom-production.up.railway.app'],
+    origin: ['http://localhost:5173', 'https://yourchore.com', 'https://www.yourchore.com', 'https://yourchorecom-production.up.railway.app'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
 
@@ -227,60 +229,166 @@ app.post('/api/stripe-webhook', async (req, res) => {
         return res.status(400).json({ error: 'Webhook signature verification failed' });
     }
 
-    // Handle the checkout.session.completed event
-    if (event.type === 'checkout.session.completed') {
-        try {
-            const session = event.data.object as Stripe.Checkout.Session;
-            console.log('Payment succeeded:', session);
+    try {
+        // Handle different event types
+        switch (event.type) {
+            case 'checkout.session.completed': {
+                const session = event.data.object as Stripe.Checkout.Session;
+                console.log('Payment succeeded:', session);
 
-            // Extract customer information
-            let customerName = 'Guest';
-            let roomNumber = 'Not specified';
+                // Extract customer information
+                let customerName = 'Guest';
+                let roomNumber = 'Not specified';
+                let orderReference = '';
 
-            if (session.customer_details) {
-                customerName = session.customer_details.name || 'Guest';
-            }
-
-            // Extract service information and metadata
-            if (session.metadata) {
-                roomNumber = session.metadata.room || 'Not specified';
-            }
-
-            // Get payment details
-            const amountPaid = session.amount_total ? session.amount_total / 100 : 0; // Convert from cents
-            const royaltyFee = amountPaid * 0.10; // 10% royalty
-
-            // Create a new order
-            const newOrder: ChoreOrder = {
-                id: uuidv4(),
-                name: customerName,
-                room: roomNumber,
-                service: '14kg Mixed Load', // Default service
-                time: new Date().toISOString(),
-                amountPaid,
-                royalty: royaltyFee,
-                status: 'Pending',
-                paymentMethod: 'stripe',
-                metadata: {
-                    stripeSessionId: session.id,
-                    paymentIntent: session.payment_intent,
-                    customerEmail: session.customer_details?.email
+                if (session.customer_details) {
+                    customerName = session.customer_details.name || 'Guest';
                 }
-            };
 
-            // Store the order
-            orderRepository.addOrder(newOrder);
-            console.log('Order stored:', newOrder);
+                // Extract service information and metadata
+                if (session.metadata) {
+                    roomNumber = session.metadata.room || 'Not specified';
+                    orderReference = session.metadata.orderReference || '';
+                }
 
-            res.json({ received: true, orderId: newOrder.id });
-        } catch (error) {
-            console.error('Error processing webhook:', error);
-            res.status(500).json({ error: 'Error processing webhook' });
+                // Get payment details
+                const amountPaid = session.amount_total ? session.amount_total / 100 : 0; // Convert from cents
+                const royaltyFee = amountPaid * 0.10; // 10% royalty
+
+                // Look for existing order reference if provided
+                let existingOrder = null;
+                if (orderReference) {
+                    existingOrder = orderRepository.getOrderById(orderReference);
+                }
+
+                if (existingOrder) {
+                    // Update existing order with payment information
+                    existingOrder.status = 'Pending';
+                    existingOrder.metadata = {
+                        ...existingOrder.metadata,
+                        stripeSessionId: session.id,
+                        paymentIntent: session.payment_intent,
+                        customerEmail: session.customer_details?.email,
+                        paymentStatus: 'paid',
+                        paidAt: new Date().toISOString()
+                    };
+
+                    orderRepository.updateOrderStatus(existingOrder.id, 'Pending');
+                    console.log('Order updated with payment:', existingOrder.id);
+                } else {
+                    // Create a new order
+                    const newOrder: ChoreOrder = {
+                        id: uuidv4(),
+                        name: customerName,
+                        room: roomNumber,
+                        service: '14kg Mixed Load', // Default service
+                        time: new Date().toISOString(),
+                        amountPaid,
+                        royalty: royaltyFee,
+                        status: 'Pending',
+                        paymentMethod: 'stripe',
+                        metadata: {
+                            stripeSessionId: session.id,
+                            paymentIntent: session.payment_intent,
+                            customerEmail: session.customer_details?.email,
+                            paymentStatus: 'paid',
+                            paidAt: new Date().toISOString()
+                        }
+                    };
+
+                    // Store the order
+                    orderRepository.addOrder(newOrder);
+                    console.log('New order created from payment:', newOrder.id);
+
+                    // Here you would typically send an email confirmation
+                    // This would be implemented with an email service
+                }
+
+                break;
+            }
+            case 'payment_intent.succeeded': {
+                const paymentIntent = event.data.object as Stripe.PaymentIntent;
+                console.log('PaymentIntent succeeded:', paymentIntent.id);
+                break;
+            }
+            case 'payment_intent.payment_failed': {
+                const paymentIntent = event.data.object as Stripe.PaymentIntent;
+                console.log('PaymentIntent failed:', paymentIntent.id);
+                break;
+            }
+            default:
+                console.log(`Unhandled event type: ${event.type}`);
         }
-    } else {
-        // Handle other event types
-        console.log(`Unhandled event type: ${event.type}`);
+
+        // Return a 200 response to acknowledge receipt of the event
         res.json({ received: true });
+    } catch (error) {
+        console.error('Error processing webhook:', error);
+        res.status(500).json({ error: 'Error processing webhook' });
+    }
+});
+
+// Create Stripe checkout session endpoint
+app.post('/api/create-checkout-session', async (req, res) => {
+    console.log('POST /api/create-checkout-session - Creating session:', req.body);
+    try {
+        const { service, price, name, room, orderId, orderReference, successUrl, cancelUrl } = req.body;
+
+        // Initialize Stripe
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+            apiVersion: '2022-11-15',
+        });
+
+        // Create Stripe checkout session
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price_data: {
+                        currency: 'usd',
+                        product_data: {
+                            name: `${service} Laundry Service`,
+                            description: `Laundry service for ${name} (Room: ${room})`,
+                        },
+                        unit_amount: Math.round(price * 100), // Convert to cents
+                    },
+                    quantity: 1,
+                },
+            ],
+            mode: 'payment',
+            success_url: successUrl,
+            cancel_url: cancelUrl,
+            metadata: {
+                orderId,
+                orderReference,
+                service,
+                room,
+                name
+            },
+            customer_email: req.body.email,
+        });
+
+        // Update the order in the repository to mark that checkout has been initiated
+        const existingOrder = orderRepository.getOrderById(orderReference);
+        if (existingOrder) {
+            existingOrder.metadata = {
+                ...existingOrder.metadata,
+                checkoutSessionId: session.id,
+                checkoutInitiated: true,
+                checkoutTime: new Date().toISOString()
+            };
+        }
+
+        res.json({
+            url: session.url,
+            sessionId: session.id
+        });
+    } catch (error) {
+        console.error('Error creating checkout session:', error);
+        res.status(500).json({
+            error: 'Failed to create checkout session',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
     }
 });
 
@@ -325,11 +433,20 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Serve static frontend files AFTER API routes
-app.use(express.static(path.join(__dirname, '../../frontend/dist')));
+// Setup static file serving
+const staticPath = path.join(__dirname, '../../frontend/dist');
+console.log(`Static files path: ${staticPath}`);
+app.use(express.static(staticPath));
 
-// Serve frontend for all other routes
+// Handle all other routes by serving the index.html
+// This enables client-side routing to work properly
 app.get('*', (req, res) => {
+    // Don't interfere with API routes
+    if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'API endpoint not found' });
+    }
+
+    console.log(`Serving index.html for path: ${req.path}`);
     res.sendFile(path.join(__dirname, '../../frontend/dist/index.html'));
 });
 

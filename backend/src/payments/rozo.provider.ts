@@ -25,9 +25,18 @@ export class RozoPaymentProvider implements PaymentProvider {
     }
 
     async processRefund(order: Order, amount?: number): Promise<RefundResult> {
+        // Implement refund process with Rozo
         return {
             success: false,
-            error: 'Rozo refunds are not yet implemented'
+            error: 'Rozo refunds not available yet'
         };
+    }
+
+    getName(): string {
+        return this.name;
+    }
+
+    async isAvailable(): Promise<boolean> {
+        return this.isActive;
     }
 }

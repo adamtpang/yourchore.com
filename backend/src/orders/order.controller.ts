@@ -27,26 +27,39 @@ export class OrderController {
         try {
             const {
                 name,
-                roomNumber,
-                laundryType,
+                room,
+                service,
                 paymentMethod,
-                basePrice,
-                royaltyFee
+                orderReference,
+                basePrice = 28,
+                royaltyFee = basePrice * 0.1
             } = req.body;
 
+            console.log('Creating order with data:', req.body);
+
+            const now = new Date().toISOString();
+
             const order = this.orderService.createOrder({
+                id: orderReference || `order-${Date.now()}`,
                 totalAmount: basePrice,
                 royaltyFee,
                 paymentMethod,
+                status: OrderStatus.PENDING,
+                time: now,
+                name: name || 'Unknown',
+                room: room || 'Unknown',
+                service: service || 'Laundry – 14kg Mixed Load',
+                amountPaid: basePrice,
+                tipAmount: 0,
                 metadata: {
-                    name,
-                    roomNumber,
-                    laundryType
+                    ...req.body,
+                    createdAt: now
                 }
             });
 
             res.status(201).json(order);
         } catch (error) {
+            console.error('Error creating order:', error);
             res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error occurred' });
         }
     }

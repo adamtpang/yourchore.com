@@ -67,20 +67,35 @@ export interface OperatingHours {
 }
 
 // Order related types
-export interface Order extends BaseEntity {
-    serviceId: string;
-    vendorId: string;
-    customerId: string;
-    status: OrderStatus;
-    items: OrderItem[];
-    totalAmount: number;
+export enum OrderStatus {
+    PENDING = 'Pending',
+    PICKED_UP = 'Picked Up',
+    DELIVERED = 'Delivered'
+}
+
+export enum PaymentStatus {
+    PENDING = 'Pending',
+    AUTHORIZED = 'Authorized',
+    PAID = 'Paid',
+    FAILED = 'Failed',
+    REFUNDED = 'Refunded'
+}
+
+export interface Order {
+    id: string;
+    name: string;
+    room: string;
+    service: string;
+    amountPaid: number;
+    tipAmount: number;
     royaltyFee: number;
-    paymentStatus: PaymentStatus;
+    status: OrderStatus;
     paymentMethod: string;
-    paymentDetails?: any;
-    metadata: {
-        [key: string]: any;
-    };
+    time: string;
+    createdAt: Date;
+    updatedAt: Date;
+    totalAmount: number;
+    metadata?: Record<string, any>;
 }
 
 export interface OrderItem {
@@ -94,32 +109,19 @@ export interface OrderItem {
     };
 }
 
-export enum OrderStatus {
-    PENDING = 'pending',
-    ACCEPTED = 'accepted',
-    PICKED_UP = 'picked_up',
-    IN_PROGRESS = 'in_progress',
-    COMPLETED = 'completed',
-    DELIVERED = 'delivered',
-    CANCELLED = 'cancelled'
-}
-
-export enum PaymentStatus {
-    PENDING = 'pending',
-    AUTHORIZED = 'authorized',
-    PAID = 'paid',
-    FAILED = 'failed',
-    REFUNDED = 'refunded'
-}
-
 // Payment related types
-export interface PaymentProvider extends BaseEntity {
+export interface PaymentProvider {
+    id: string;
     name: string;
     isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
     config: any;
     processPayment(order: Order): Promise<PaymentResult>;
     getPaymentStatus(transactionId: string): Promise<PaymentStatus>;
     processRefund(order: Order, amount?: number): Promise<RefundResult>;
+    getName(): string;
+    isAvailable(): Promise<boolean>;
 }
 
 export interface PaymentResult {

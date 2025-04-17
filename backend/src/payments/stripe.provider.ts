@@ -22,8 +22,9 @@ export class StripePaymentProvider implements PaymentProvider {
                 currency: 'usd',
                 metadata: {
                     orderId: order.id,
-                    serviceId: order.serviceId,
-                    vendorId: order.vendorId
+                    service: order.service,
+                    // Use metadata for additional information if needed
+                    ...order.metadata
                 }
             });
             return {
@@ -64,10 +65,21 @@ export class StripePaymentProvider implements PaymentProvider {
 
     async processRefund(order: Order, amount?: number): Promise<RefundResult> {
         try {
+            // Get transaction ID from metadata if available
+            const transactionId = order.metadata?.paymentId;
+
+            if (!transactionId) {
+                return {
+                    success: false,
+                    error: 'No payment ID found for this order'
+                };
+            }
+
             const refund = await this.stripe.refunds.create({
-                payment_intent: order.paymentDetails?.transactionId,
+                payment_intent: transactionId,
                 amount: amount ? Math.round(amount * 100) : undefined
             });
+
             return {
                 success: true,
                 refundId: refund.id,

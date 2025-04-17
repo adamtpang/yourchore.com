@@ -1,0 +1,77 @@
+[
+  {
+    "id": "4690149c-7985-4f48-b9ed-671cc3ae3e10",
+    "totalAmount": 28,
+    "royaltyFee": 2.8000000000000003,
+    "status": "Delivered",
+    "time": "2025-04-17T09:02:07.773Z",
+    "createdAt": "2025-04-17T09:02:07.773Z",
+    "updatedAt": "2025-04-17T09:04:39.231Z",
+    "name": "Adam Pang",
+    "room": "9001",
+    "service": "Mixed Wash & Dry (14kgs)",
+    "amountPaid": 28,
+    "tipAmount": 0,
+    "paymentMethod": "stripe",
+    "metadata": {
+      "name": "Adam Pang",
+      "room": "9001",
+      "service": "Mixed Wash & Dry (14kgs)",
+      "paymentMethod": "stripe",
+      "basePrice": 28,
+      "royaltyFee": 2.8000000000000003,
+      "orderReference": "4690149c-7985-4f48-b9ed-671cc3ae3e10",
+      "createdAt": "2025-04-17T09:02:07.773Z"
+    }
+  },
+  {
+    "id": "09dbcbdb-d1ea-4974-952e-94043c71001a",
+    "totalAmount": 52,
+    "royaltyFee": 5.2,
+    "status": "Delivered",
+    "time": "2025-04-17T09:02:15.154Z",
+    "createdAt": "2025-04-17T09:02:15.154Z",
+    "updatedAt": "2025-04-17T09:04:42.139Z",
+    "name": "Adam Pang",
+    "room": "9001",
+    "service": "Mixed Wash & Dry (28kgs)",
+    "amountPaid": 52,
+    "tipAmount": 0,
+    "paymentMethod": "stripe",
+    "metadata": {
+      "name": "Adam Pang",
+      "room": "9001",
+      "service": "Mixed Wash & Dry (28kgs)",
+      "paymentMethod": "stripe",
+      "basePrice": 52,
+      "royaltyFee": 5.2,
+      "orderReference": "09dbcbdb-d1ea-4974-952e-94043c71001a",
+      "createdAt": "2025-04-17T09:02:15.154Z"
+    }
+  },
+  {
+    "id": "ab20d5f5-d8db-49f6-8f17-a799be3e327f",
+    "totalAmount": 28,
+    "royaltyFee": 2.8000000000000003,
+    "status": "Picked Up",
+    "time": "2025-04-17T09:02:22.634Z",
+    "createdAt": "2025-04-17T09:02:22.634Z",
+    "updatedAt": "2025-04-17T09:04:33.742Z",
+    "name": "Adam Pang",
+    "room": "9001",
+    "service": "Mixed Wash & Dry (14kgs)",
+    "amountPaid": 28,
+    "tipAmount": 0,
+    "paymentMethod": "stripe",
+    "metadata": {
+      "name": "Adam Pang",
+      "room": "9001",
+      "service": "Mixed Wash & Dry (14kgs)",
+      "paymentMethod": "stripe",
+      "basePrice": 28,
+      "royaltyFee": 2.8000000000000003,
+      "orderReference": "ab20d5f5-d8db-49f6-8f17-a799be3e327f",
+      "createdAt": "2025-04-17T09:02:22.634Z"
+    }
+  }
+]

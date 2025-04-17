@@ -2,15 +2,23 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline'
 
-const navigation = [
+// Define public navigation items
+const publicNavigation = [
     { name: 'Home', to: '/' },
-    { name: 'Order', to: '/order' },
-    { name: 'Dashboard', to: '/dashboard' },
-]
+    { name: 'Laundry', to: '/laundry' },
+];
 
 const Navbar = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const location = useLocation()
+
+    // Show admin link only if we're already on the admin page
+    const isAdminPage = location.pathname === '/admin';
+
+    // Determine which navigation items to show
+    const navigation = isAdminPage
+        ? [...publicNavigation, { name: 'Admin', to: '/admin' }]
+        : publicNavigation;
 
     const isActive = (path: string) => {
         return location.pathname === path
@@ -35,8 +43,8 @@ const Navbar = () => {
                                 key={item.name}
                                 to={item.to}
                                 className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors duration-200 ${isActive(item.to)
-                                        ? 'border-b-2 border-primary-500 text-gray-900'
-                                        : 'border-b-2 border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                                    ? 'border-b-2 border-primary-500 text-gray-900'
+                                    : 'border-b-2 border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
                                     }`}
                             >
                                 {item.name}
@@ -70,8 +78,8 @@ const Navbar = () => {
                             key={item.name}
                             to={item.to}
                             className={`block py-2 pl-3 pr-4 text-base font-medium transition-colors duration-200 ${isActive(item.to)
-                                    ? 'bg-primary-50 border-l-4 border-primary-500 text-primary-700'
-                                    : 'border-l-4 border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
+                                ? 'bg-primary-50 border-l-4 border-primary-500 text-primary-700'
+                                : 'border-l-4 border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
                                 }`}
                             onClick={() => setMobileMenuOpen(false)}
                         >

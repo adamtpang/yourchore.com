@@ -7,8 +7,9 @@ interface Order {
     room: string;
     service: string;
     time: string;
-    amountPaid: number;
-    royalty: number;
+    amountPaid?: number;
+    tipAmount?: number;
+    royalty?: number;
     status: 'Pending' | 'Picked Up' | 'Delivered';
     paymentMethod: string;
     metadata?: Record<string, any>;
@@ -62,20 +63,20 @@ const AdminDashboard: React.FC = () => {
         }
 
         // Format orders as CSV
-        const headers = ['Name', 'Room', 'Service', 'Amount (RM)', 'Royalty (RM)', 'Status', 'Date', 'Time'];
+        const headers = ['Name', 'Room', 'Service', 'Paid (RM)', 'Tip (RM)', 'Status', 'Time', 'Royalty (10%)'];
         const csvRows = [
             headers.join(','),
             ...orders.map(order => {
                 const date = new Date(order.time);
                 return [
-                    `"${order.name}"`,
-                    `"${order.room}"`,
-                    `"${order.service}"`,
-                    order.amountPaid.toFixed(2),
-                    order.royalty.toFixed(2),
-                    `"${order.status}"`,
-                    date.toLocaleDateString(),
-                    date.toLocaleTimeString()
+                    `"${order.name || 'N/A'}"`,
+                    `"${order.room || 'N/A'}"`,
+                    `"${order.service || 'N/A'}"`,
+                    (order.amountPaid || 0).toFixed(2),
+                    (order.tipAmount || 0).toFixed(2),
+                    `"${order.status || 'Pending'}"`,
+                    `"${date.toLocaleDateString()} ${date.toLocaleTimeString()}"`,
+                    (order.royalty || 0).toFixed(2)
                 ].join(',');
             })
         ];
@@ -96,8 +97,8 @@ const AdminDashboard: React.FC = () => {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-100">
                 <div className="text-center">
-                    <div className="spinner mb-4"></div>
-                    <p className="text-gray-600">Loading orders...</p>
+                    <div className="w-16 h-16 border-t-4 border-b-4 border-blue-500 rounded-full animate-spin mx-auto"></div>
+                    <p className="mt-4 text-gray-600">Loading orders...</p>
                 </div>
             </div>
         );
@@ -133,7 +134,7 @@ const AdminDashboard: React.FC = () => {
                     <div className="flex items-center">
                         {loading && (
                             <div className="text-sm text-gray-500 flex items-center">
-                                <div className="spinner-sm mr-2"></div>
+                                <div className="w-4 h-4 border-t-2 border-b-2 border-blue-500 rounded-full animate-spin mr-2"></div>
                                 Refreshing data...
                             </div>
                         )}
@@ -163,19 +164,28 @@ const AdminDashboard: React.FC = () => {
                             <thead className="bg-gray-50">
                                 <tr>
                                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Customer
+                                        Name
+                                    </th>
+                                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Room
                                     </th>
                                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Service
                                     </th>
                                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Amount
+                                        Paid (RM)
                                     </th>
                                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Date/Time
+                                        Tip (RM)
                                     </th>
                                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Status
+                                    </th>
+                                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Time
+                                    </th>
+                                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Royalty (10%)
                                     </th>
                                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Actions
@@ -185,61 +195,66 @@ const AdminDashboard: React.FC = () => {
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {orders.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="px-4 sm:px-6 py-4 text-center text-gray-500">
+                                        <td colSpan={9} className="px-4 sm:px-6 py-4 text-center text-gray-500">
                                             No orders found yet. When customers place orders, they'll appear here automatically.
                                         </td>
                                     </tr>
                                 ) : (
                                     orders.map((order) => (
                                         <tr key={order.id} className="hover:bg-gray-50">
-                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm font-medium text-gray-900">{order.name}</div>
-                                                <div className="text-sm text-gray-500">Room: {order.room}</div>
+                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {order.name || 'N/A'}
+                                            </td>
+                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {order.room || 'N/A'}
+                                            </td>
+                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {order.service || 'N/A'}
+                                            </td>
+                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                RM{(order.amountPaid || 0).toFixed(2)}
+                                            </td>
+                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                RM{(order.tipAmount || 0).toFixed(2)}
                                             </td>
                                             <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm text-gray-900">{order.service}</div>
-                                            </td>
-                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm text-gray-900">RM{order.amountPaid.toFixed(2)}</div>
-                                                <div className="text-xs text-gray-500">Royalty: RM{order.royalty.toFixed(2)}</div>
-                                            </td>
-                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm text-gray-900">
-                                                    {new Date(order.time).toLocaleDateString()}
-                                                </div>
-                                                <div className="text-xs text-gray-500">
-                                                    {new Date(order.time).toLocaleTimeString()}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                                                    ${order.status === 'Delivered' ? 'bg-green-100 text-green-800' :
-                                                        order.status === 'Picked Up' ? 'bg-yellow-100 text-yellow-800' :
-                                                            'bg-gray-100 text-gray-800'}`}
+                                                <select
+                                                    value={order.status}
+                                                    onChange={(e) => updateOrderStatus(order.id, e.target.value as Order['status'])}
+                                                    className={`text-sm rounded px-2 py-1 border
+                                                        ${order.status === 'Delivered' ? 'bg-green-50 border-green-200 text-green-800' :
+                                                            order.status === 'Picked Up' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
+                                                                'bg-gray-50 border-gray-200 text-gray-800'}`}
                                                 >
-                                                    {order.status}
+                                                    <option value="Pending">Pending</option>
+                                                    <option value="Picked Up">Picked Up</option>
+                                                    <option value="Delivered">Delivered</option>
+                                                </select>
+                                            </td>
+                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {new Date(order.time).toLocaleDateString()}<br />
+                                                <span className="text-xs text-gray-500">
+                                                    {new Date(order.time).toLocaleTimeString()}
                                                 </span>
                                             </td>
-                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                                                <div className="flex gap-2">
-                                                    {order.status !== 'Picked Up' && (
-                                                        <button
-                                                            onClick={() => updateOrderStatus(order.id, 'Picked Up')}
-                                                            className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200 transition-colors"
-                                                        >
-                                                            Mark Picked Up
-                                                        </button>
-                                                    )}
-
-                                                    {order.status !== 'Delivered' && (
-                                                        <button
-                                                            onClick={() => updateOrderStatus(order.id, 'Delivered')}
-                                                            className="px-2 py-1 bg-green-100 text-green-800 rounded hover:bg-green-200 transition-colors"
-                                                        >
-                                                            Mark Delivered
-                                                        </button>
-                                                    )}
-                                                </div>
+                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                RM{(order.royalty || 0).toFixed(2)}
+                                            </td>
+                                            <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm space-y-1">
+                                                <button
+                                                    onClick={() => updateOrderStatus(order.id, 'Picked Up')}
+                                                    className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200 transition-colors w-full text-center"
+                                                    disabled={order.status === 'Picked Up' || order.status === 'Delivered'}
+                                                >
+                                                    Picked Up
+                                                </button>
+                                                <button
+                                                    onClick={() => updateOrderStatus(order.id, 'Delivered')}
+                                                    className="px-2 py-1 bg-green-100 text-green-800 rounded hover:bg-green-200 transition-colors w-full text-center"
+                                                    disabled={order.status === 'Delivered'}
+                                                >
+                                                    Delivered
+                                                </button>
                                             </td>
                                         </tr>
                                     ))
