@@ -23,15 +23,16 @@ export class LaundryService implements BaseService {
   async createOrder(data: Partial<Order>): Promise<Order> {
     const order: Order = {
       id: uuidv4(),
-      serviceId: this.config.service.id,
-      vendorId: this.config.vendor.id,
+      service: this.config.service.name,
+      name: data.name || 'Guest',
+      room: data.room || 'Not specified',
+      amountPaid: 0, // Will be updated after payment
+      tipAmount: data.tipAmount || 0,
       paymentMethod: data.paymentMethod!,
       status: OrderStatus.PENDING,
       totalAmount: await this.calculatePrice(data),
       royaltyFee: 0, // Will be calculated based on vendor's royalty rate
-      paymentStatus: PaymentStatus.PENDING,
-      items: [],
-      customerId: data.customerId || 'guest',
+      time: new Date().toISOString(),
       metadata: data.metadata || {},
       createdAt: new Date(),
       updatedAt: new Date()

@@ -7,8 +7,11 @@ import Stripe from 'stripe';
 import { v4 as uuidv4 } from 'uuid';
 import { LaundryService } from './services/laundry/laundry.service';
 import { StripePaymentProvider } from './payments/stripe.provider';
-import { Service, Vendor, PaymentProvider, ServiceType } from './types';
-import { orderRepository, ChoreOrder } from './orders/order-repository';
+import { Service, Vendor, PaymentProvider, ServiceType, Order, OrderStatus } from './types';
+import { OrderRepository } from './orders/order-repository';
+
+// Create an instance of the OrderRepository
+const orderRepository = new OrderRepository();
 
 // Debug logging
 console.log('Starting server with debug info:');
@@ -255,55 +258,54 @@ app.post('/api/stripe-webhook', async (req, res) => {
                 const amountPaid = session.amount_total ? session.amount_total / 100 : 0; // Convert from cents
                 const royaltyFee = amountPaid * 0.10; // 10% royalty
 
-                // Look for existing order reference if provided
-                let existingOrder = null;
                 if (orderReference) {
-                    existingOrder = orderRepository.getOrderById(orderReference);
-                }
+                    // Check if order already exists
+                    let existingOrder;
+                    try {
+                        existingOrder = orderRepository.findById(orderReference);
 
-                if (existingOrder) {
-                    // Update existing order with payment information
-                    existingOrder.status = 'Pending';
-                    existingOrder.metadata = {
-                        ...existingOrder.metadata,
-                        stripeSessionId: session.id,
-                        paymentIntent: session.payment_intent,
-                        customerEmail: session.customer_details?.email,
-                        paymentStatus: 'paid',
-                        paidAt: new Date().toISOString()
-                    };
+                        if (existingOrder) {
+                            console.log('Found existing order:', existingOrder);
 
-                    orderRepository.updateOrderStatus(existingOrder.id, 'Pending');
-                    console.log('Order updated with payment:', existingOrder.id);
-                } else {
-                    // Create a new order
-                    const newOrder: ChoreOrder = {
-                        id: uuidv4(),
-                        name: customerName,
-                        room: roomNumber,
-                        service: '14kg Mixed Load', // Default service
-                        time: new Date().toISOString(),
-                        amountPaid,
-                        royalty: royaltyFee,
-                        status: 'Pending',
-                        paymentMethod: 'stripe',
-                        metadata: {
-                            stripeSessionId: session.id,
-                            paymentIntent: session.payment_intent,
-                            customerEmail: session.customer_details?.email,
-                            paymentStatus: 'paid',
-                            paidAt: new Date().toISOString()
+                            // Update order status to Pending
+                            orderRepository.update({
+                                ...existingOrder,
+                                status: OrderStatus.PENDING
+                            });
+
+                            res.json({ received: true, orderId: existingOrder.id });
+                            return;
                         }
-                    };
-
-                    // Store the order
-                    orderRepository.addOrder(newOrder);
-                    console.log('New order created from payment:', newOrder.id);
-
-                    // Here you would typically send an email confirmation
-                    // This would be implemented with an email service
+                    } catch (err) {
+                        console.log('Error finding order:', err);
+                    }
                 }
 
+                // Create a new order
+                const newOrder: Order = {
+                    id: uuidv4(),
+                    name: customerName,
+                    room: roomNumber,
+                    service: 'Laundry',
+                    amountPaid: session.amount_total ? session.amount_total / 100 : 0,
+                    tipAmount: 0, // Need to extract this from session if available
+                    royaltyFee: 0, // Calculate based on policy
+                    status: OrderStatus.PENDING,
+                    paymentMethod: 'stripe',
+                    time: new Date().toISOString(),
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    totalAmount: session.amount_total ? session.amount_total / 100 : 0,
+                    metadata: {
+                        stripeSessionId: session.id,
+                        customerEmail: session.customer_details?.email,
+                        // Add other relevant data
+                    }
+                };
+
+                // Save order to repository
+                orderRepository.create(newOrder);
+                console.log('New order created:', newOrder.id);
                 break;
             }
             case 'payment_intent.succeeded': {
@@ -369,14 +371,17 @@ app.post('/api/create-checkout-session', async (req, res) => {
         });
 
         // Update the order in the repository to mark that checkout has been initiated
-        const existingOrder = orderRepository.getOrderById(orderReference);
+        const existingOrder = orderRepository.findById(orderReference);
         if (existingOrder) {
-            existingOrder.metadata = {
-                ...existingOrder.metadata,
-                checkoutSessionId: session.id,
-                checkoutInitiated: true,
-                checkoutTime: new Date().toISOString()
-            };
+            const updatedOrder = orderRepository.update({
+                ...existingOrder,
+                metadata: {
+                    ...existingOrder.metadata,
+                    checkoutSessionId: session.id,
+                    checkoutInitiated: true,
+                    checkoutTime: new Date().toISOString()
+                }
+            });
         }
 
         res.json({
@@ -395,7 +400,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
 // Get all orders - for admin dashboard
 app.get('/api/orders', (req, res) => {
     try {
-        const orders = orderRepository.getOrders();
+        const orders = orderRepository.findAll();
         res.json(orders);
     } catch (error) {
         console.error('Error fetching orders:', error);
@@ -406,21 +411,54 @@ app.get('/api/orders', (req, res) => {
     }
 });
 
+// Get a single order
+app.get('/api/orders/:id', (req, res) => {
+    const { id } = req.params;
+    const orderReference = id;
+
+    try {
+        const existingOrder = orderRepository.findById(orderReference);
+
+        if (!existingOrder) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        res.json(existingOrder);
+    } catch (error) {
+        console.error('Error fetching order:', error);
+        res.status(500).json({
+            error: 'Error fetching order',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+});
+
 // Update order status
 app.put('/api/orders/:id/status', (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    if (!status || !['Pending', 'Picked Up', 'Delivered'].includes(status)) {
-        return res.status(400).json({ error: 'Invalid status. Valid values are: Pending, Picked Up, Delivered' });
-    }
+    try {
+        const existingOrder = orderRepository.findById(id);
 
-    const updatedOrder = orderRepository.updateOrderStatus(id, status);
-    if (!updatedOrder) {
-        return res.status(404).json({ error: 'Order not found' });
-    }
+        if (!existingOrder) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
 
-    res.json(updatedOrder);
+        const updatedOrder = orderRepository.update({
+            ...existingOrder,
+            status: status,
+            updatedAt: new Date()
+        });
+
+        res.json(updatedOrder);
+    } catch (error) {
+        console.error('Error updating order status:', error);
+        res.status(500).json({
+            error: 'Error updating order status',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
 });
 
 // Health check endpoint
